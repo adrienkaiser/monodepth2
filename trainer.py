@@ -503,7 +503,8 @@ class Trainer:
         """
         depth_pred = outputs[("depth", 0, 0)]
         depth_pred = torch.clamp(F.interpolate(
-            depth_pred, [375, 1242], mode="bilinear", align_corners=False), 1e-3, 80)
+            depth_pred, [self.train_loader.dataset.full_res_shape[1], self.train_loader.dataset.full_res_shape[0]],
+            mode="bilinear", align_corners=False), 1e-3, 80)
         depth_pred = depth_pred.detach()
 
         depth_gt = inputs["depth_gt"]
@@ -511,7 +512,7 @@ class Trainer:
 
         # garg/eigen crop
         crop_mask = torch.zeros_like(mask)
-        crop_mask[:, :, 153:371, 44:1197] = 1
+        crop_mask[:, :, 153:-4, 44:-45] = 1
         mask = mask * crop_mask
 
         depth_gt = depth_gt[mask]
