@@ -82,7 +82,7 @@ def evaluate(opt):
 
         encoder_dict = torch.load(encoder_path, map_location=device)
 
-        dataset = datasets.KITTIRAWDataset(opt.data_path, filenames,
+        dataset = (datasets.ScannetDataset if opt.dataset=="scannet" else datasets.KITTIRAWDataset)(opt.data_path, filenames,
                                            encoder_dict['height'], encoder_dict['width'],
                                            [0], 4, is_train=False)
         dataloader = DataLoader(dataset, 16, shuffle=False, num_workers=opt.num_workers,
@@ -101,6 +101,7 @@ def evaluate(opt):
         depth_decoder.eval()
 
         pred_disps = []
+        gt_depths = []
 
         print("-> Computing predictions with size {}x{}".format(
             encoder_dict['width'], encoder_dict['height']))
@@ -124,7 +125,11 @@ def evaluate(opt):
 
                 pred_disps.append(pred_disp)
 
+                if opt.dataset == "scannet":
+                    gt_depths.append(np.squeeze(data[("depth_gt")].cpu().numpy(), axis=1))
+
         pred_disps = np.concatenate(pred_disps)
+        gt_depths = np.concatenate(gt_depths)
 
     else:
         # Load predictions from file
@@ -164,8 +169,23 @@ def evaluate(opt):
         print("-> No ground truth is available for the KITTI benchmark, so not evaluating. Done.")
         quit()
 
-    gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
-    gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
+    elif opt.eval_split == 'scannet':
+        save_dir = os.path.join(opt.load_weights_folder, "depth_predictions")
+        print("-> Saving out depth predictions to {}".format(save_dir))
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        for idx in range(len(pred_disps)):
+            disp_resized = cv2.resize(pred_disps[idx], (640, 480))
+            depth = STEREO_SCALE_FACTOR / disp_resized
+            depth = np.clip(depth, 0, 80)
+            depth = np.uint16(depth * 256)
+            save_path = os.path.join(save_dir, "{}.png".format(filenames[idx].split()[1]))
+            cv2.imwrite(save_path, depth)
+
+    if not opt.dataset == "scannet" or not opt.ext_disp_to_eval is None:
+        gt_path = os.path.join(splits_dir, opt.eval_split, "gt_depths.npz")
+        gt_depths = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
 
     print("-> Evaluating")
 
