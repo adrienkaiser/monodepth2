@@ -3,7 +3,7 @@ import os
 import random # shuffle()
 
 scannetdatafolder = "/path/to/Scannet"
-monodepth2home = "/path/to/monodepth2"
+monodepth2splitsdir = os.path.abspath(os.path.dirname(__file__))
 
 # TODO: Improve this arbitrary train/val/test separation ?
 train_scenes = [
@@ -20,7 +20,7 @@ val_scenes = [
 test_scenes = [
     "apt-rgbd"]
 
-scannetsplitfilesfolder = os.path.join(monodepth2home, "splits/scannet")
+scannetsplitfilesfolder = os.path.join(monodepth2splitsdir, "scannet")
 
 if not os.path.exists(scannetsplitfilesfolder):
     print("Creating splits folder:", scannetsplitfilesfolder)
