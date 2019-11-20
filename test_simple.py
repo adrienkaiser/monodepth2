@@ -104,6 +104,7 @@ def test_simple(args):
         raise Exception("Can not find args.image_path: {}".format(args.image_path))
 
     camera_intrinsics_px = [1242*0.58, 375*1.92, 1242*0.5, 375*0.5] # See datasets/kitti_dataset.py
+    # camera_intrinsics_px = [577.870605, 577.870605, 319.5, 239.5] # See datasets/scannet_dataset.py
     # TODO: improve loading intrinsics from file ?
 
     print("-> Predicting on {:d} test images".format(len(paths)))
