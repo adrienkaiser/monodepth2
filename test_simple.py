@@ -102,20 +102,23 @@ def test_simple(args):
     else:
         raise Exception("Can not find args.image_path: {}".format(args.image_path))
 
+    camera_intrinsics_px = [1242*0.58, 375*1.92, 1242*0.5, 375*0.5] # See datasets/kitti_dataset.py
+    # TODO: improve loading intrinsics from file ?
+
     print("-> Predicting on {:d} test images".format(len(paths)))
 
     # PREDICTING ON EACH IMAGE IN TURN
     with torch.no_grad():
         for idx, image_path in enumerate(paths):
 
-            if image_path.endswith("_disp.jpg"):
+            if image_path.endswith("_disp.jpeg"):
                 # don't try to predict disparity for a disparity image!
                 continue
 
             # Load image and preprocess
-            input_image = pil.open(image_path).convert('RGB')
-            original_width, original_height = input_image.size
-            input_image = input_image.resize((feed_width, feed_height), pil.LANCZOS)
+            input_image_original = pil.open(image_path).convert('RGB')
+            original_width, original_height = input_image_original.size
+            input_image = input_image_original.resize((feed_width, feed_height), pil.LANCZOS)
             input_image = transforms.ToTensor()(input_image).unsqueeze(0)
 
             # PREDICTION
@@ -130,8 +133,39 @@ def test_simple(args):
             # Saving numpy file
             output_name = os.path.splitext(os.path.basename(image_path))[0]
             name_dest_npy = os.path.join(output_directory, "{}_disp.npy".format(output_name))
-            scaled_disp, _ = disp_to_depth(disp, 0.1, 100)
+            scaled_disp, depth = disp_to_depth(disp, 0.1, 100)
             np.save(name_dest_npy, scaled_disp.cpu().numpy())
+
+            # Save PLY pointcloud from depth map
+            depth_resized = torch.nn.functional.interpolate(
+                depth, (original_height, original_width), mode="nearest") # !! do not interpolate depth values
+            depth_resized_np = depth_resized.cpu().numpy()[0][0]
+            nbPts = 0
+            plypoints = ""
+            for v in range(0, original_height):
+                for u in range(0, original_width):
+                    d = depth_resized_np[v][u]
+                    if d <= 0.0:
+                        continue
+                    r,g,b = input_image_original.getpixel((u,v))
+                    x = d * (float(u) - camera_intrinsics_px[2]) / camera_intrinsics_px[0]
+                    y = d * (float(v) - camera_intrinsics_px[3]) / camera_intrinsics_px[1]
+                    z = d * 1.0;
+                    nbPts += 1
+                    plypoints += str(x) + " " + str(y) + " " + str(z) + " " + str(r) + " " + str(g) + " " + str(b) + "\n"
+            plyhead = "ply\n"
+            plyhead += "format ascii 1.0\n"
+            plyhead += "element vertex " + str(nbPts) + "\n"
+            plyhead += "property float x\n"
+            plyhead += "property float y\n"
+            plyhead += "property float z\n"
+            plyhead += "property uchar red\n"
+            plyhead += "property uchar green\n"
+            plyhead += "property uchar blue\n"
+            plyhead += "end_header\n"
+            filePly = open(os.path.join(output_directory, "{}_disp.ply".format(output_name)), "w+")
+            filePly.write(plyhead + plypoints + "\n")
+            filePly.close()
 
             # Saving colormapped depth image
             disp_resized_np = disp_resized.squeeze().cpu().numpy()
