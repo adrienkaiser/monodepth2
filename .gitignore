@@ -1,7 +1,8 @@
 __pycache__
 *.pyc
-*_disp.jpg
+*_disp.jpeg
 *_disp.npy
+*_disp.ply
 *.npz
 kitti_data
 models
